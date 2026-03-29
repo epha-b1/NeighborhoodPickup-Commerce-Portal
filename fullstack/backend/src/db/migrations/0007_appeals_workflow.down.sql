@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS appeal_files;
-DROP TABLE IF EXISTS appeal_events;
-DROP TABLE IF EXISTS appeals;
