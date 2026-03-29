@@ -1,0 +1,8 @@
+# Keep TypeScript/Vue sources as the single source of truth.
+src/main.js
+src/App.vue.js
+test/*.test.js
+
+# Ignore generated JS mirrors under source folders.
+src/**/*.js
+src/**/*.vue.js

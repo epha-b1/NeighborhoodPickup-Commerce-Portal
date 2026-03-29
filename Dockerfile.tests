@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /workspace
+
+COPY fullstack/backend/package*.json ./backend/
+COPY fullstack/frontend/package*.json ./frontend/
+RUN cd backend && npm install
+RUN cd frontend && npm install --legacy-peer-deps
+
+COPY fullstack/backend ./backend
+COPY fullstack/frontend ./frontend
+COPY docs ./docs
+
+CMD ["sh", "-c", "cd backend && npm run test && cd ../frontend && npm run test"]

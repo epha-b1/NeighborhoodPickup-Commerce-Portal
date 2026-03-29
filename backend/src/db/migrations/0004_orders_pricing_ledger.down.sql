@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS ledger_entries;
+DROP TABLE IF EXISTS settlements;
+DROP TABLE IF EXISTS ledger_accounts;
+DROP TABLE IF EXISTS order_status_history;
+DROP TABLE IF EXISTS order_pickup_window;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS pricing_rule_versions;
+DROP TABLE IF EXISTS pricing_rules;
+DROP TABLE IF EXISTS tax_jurisdictions;
