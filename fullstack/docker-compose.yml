@@ -1,0 +1,92 @@
+name: neighborhoodpickup
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: neighborhoodpickup
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    expose:
+      - "3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-prootpassword",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4000
+      FRONTEND_ORIGIN: "http://localhost:${FRONTEND_HOST_PORT:-8081}"
+      FRONTEND_ORIGINS: "http://localhost:${FRONTEND_HOST_PORT:-8081},http://localhost:5173"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: neighborhoodpickup
+      DB_CONNECTION_LIMIT: 10
+      SESSION_SECRET: docker-local-session-secret
+      SESSION_TTL_HOURS: 12
+      LOCKOUT_MAX_ATTEMPTS: 5
+      LOCKOUT_MINUTES: 15
+    ports:
+      - "4000:4000"
+    volumes:
+      - backend_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:4000
+    ports:
+      - "${FRONTEND_HOST_PORT:-8081}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: ..
+      dockerfile: fullstack/Dockerfile.tests
+    profiles: ["test"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  mysql_data:
+  backend_storage:

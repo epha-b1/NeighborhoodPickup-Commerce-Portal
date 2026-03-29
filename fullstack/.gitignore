@@ -1,0 +1,4 @@
+# Local cookie/session artifacts
+.cookiejar
+np.cookies
+*.cookies

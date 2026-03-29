@@ -1,0 +1,42 @@
+{
+  "session_type": "bugfix",
+  "trace": [
+    {
+      "id": "bugfix-2026-03-28-04",
+      "summary": "Resolved audited security and delivery defects across backend, frontend, and tests for appeals, withdrawals, encryption, integrity reporting, and engagement tracking.",
+      "changes": [
+        "Enforced object-level authorization on appeal creation so members can only appeal accessible orders and order-linked comments, while privileged roles retain elevated access.",
+        "Restricted withdrawal eligibility and creation to approved group leaders and privileged finance/admin roles, with explicit leader eligibility validation and 403 handling.",
+        "Removed the unsafe hardcoded-at-rest encryption fallback and required environment-backed key configuration for protected data handling.",
+        "Added checksum-based integrity verification for stored appeal files and exposed integrity status in the appeal status UI.",
+        "Implemented missing server/client behavior instrumentation for favorites, order and discussion impressions, votes, and thread review completion.",
+        "Added group leader self-service withdrawal UX and API coverage on the frontend.",
+        "Expanded backend and frontend tests to cover the new authorization, eligibility, telemetry, and API-client behaviors, and repaired test harness issues."
+      ],
+      "verification": {
+        "commands": [
+          {
+            "command": "npm run -w backend test",
+            "result": "pass",
+            "test_files": 15,
+            "tests": 45
+          },
+          {
+            "command": "npm run -w frontend test",
+            "result": "pass",
+            "test_files": 3,
+            "tests": 9
+          },
+          {
+            "command": "npm run -w backend build",
+            "result": "pass"
+          },
+          {
+            "command": "vue-tsc -b",
+            "result": "pass"
+          }
+        ]
+      }
+    }
+  ]
+}
