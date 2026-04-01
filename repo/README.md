@@ -7,7 +7,7 @@ Run all commands from the repository root.
 ## Start the App
 
 ```bash
-docker compose -f repo/docker-compose.yml -p neighborhoodpickup up --build -d
+docker compose --build -d
 ```
 
 This starts:
@@ -21,7 +21,7 @@ This starts:
 After the app is up:
 
 ```bash
-docker compose -f repo/docker-compose.yml -p neighborhoodpickup run --rm tests
+docker compose run --rm tests
 ```
 
 ## Default Login Credentials
@@ -35,5 +35,5 @@ docker compose -f repo/docker-compose.yml -p neighborhoodpickup run --rm tests
 ## Stop and Cleanup
 
 ```bash
-docker compose -f repo/docker-compose.yml -p neighborhoodpickup down -v --remove-orphans
+docker compose down -v --remove-orphans
 ```
