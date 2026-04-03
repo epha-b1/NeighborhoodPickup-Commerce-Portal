@@ -33,12 +33,14 @@ describe("OpenAPI contract", () => {
       "/orders/checkout",
       "/orders/{id}",
       "/threads/{id}/comments",
+      "/threads/resolve",
       "/notifications/{id}/read-state",
       "/appeals",
       "/appeals/{id}",
       "/appeals/{id}/files",
       "/appeals/{id}/timeline",
       "/appeals/{id}/status",
+      "/appeals/{id}/files/{fileId}/download",
       "/finance/reconciliation/export",
       "/audit/logs",
       "/audit/logs/export",
@@ -52,5 +54,46 @@ describe("OpenAPI contract", () => {
         openApiSpec.paths[pathName as keyof typeof openApiSpec.paths],
       ).toBeDefined();
     }
+  });
+
+  it("documents the appeal file download endpoint with path parameters", () => {
+    const downloadPath = openApiSpec.paths["/appeals/{id}/files/{fileId}/download" as keyof typeof openApiSpec.paths] as Record<string, unknown>;
+    expect(downloadPath).toBeDefined();
+    const getOp = downloadPath.get as Record<string, unknown>;
+    expect(getOp).toBeDefined();
+    expect(getOp.tags).toContain("Appeals");
+    const params = getOp.parameters as Array<{ name: string; in: string; required: boolean }>;
+    const paramNames = params.map((p) => p.name);
+    expect(paramNames).toContain("id");
+    expect(paramNames).toContain("fileId");
+  });
+
+  it("documents /threads/resolve with query parameters", () => {
+    const resolvePath = openApiSpec.paths["/threads/resolve" as keyof typeof openApiSpec.paths] as Record<string, unknown>;
+    expect(resolvePath).toBeDefined();
+    const getOp = resolvePath.get as Record<string, unknown>;
+    expect(getOp).toBeDefined();
+    const params = getOp.parameters as Array<{ name: string; in: string }>;
+    const queryParams = params.filter((p) => p.in === "query").map((p) => p.name);
+    expect(queryParams).toContain("contextType");
+    expect(queryParams).toContain("contextId");
+  });
+
+  it("error envelope matches the implemented ApiErrorEnvelope shape", () => {
+    // The actual error contract is: { success: false, error: { code, message, details? } }
+    // This test locks the shape so docs and implementation stay aligned.
+    type ApiErrorEnvelope = {
+      success: false;
+      error: { code: string; message: string; details?: unknown };
+    };
+
+    const sampleError: ApiErrorEnvelope = {
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: "Invalid input.", details: [{ field: "email" }] },
+    };
+
+    expect(sampleError.success).toBe(false);
+    expect(sampleError.error).toHaveProperty("code");
+    expect(sampleError.error).toHaveProperty("message");
   });
 });

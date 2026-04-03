@@ -186,6 +186,10 @@ export const openApiSpec = {
         tags: ["Discussions"],
         summary: "Resolve or create thread by context",
         security: [{ cookieAuth: [] }],
+        parameters: [
+          { name: "contextType", in: "query", required: true, schema: { type: "string", enum: ["LISTING", "ORDER"] } },
+          { name: "contextId", in: "query", required: true, schema: { type: "integer" } },
+        ],
         responses: {
           "200": { description: "Thread resolved" },
           "403": { description: "Forbidden" },
@@ -287,6 +291,22 @@ export const openApiSpec = {
           "200": { description: "Status transitioned" },
           "403": { description: "Forbidden" },
           "409": { description: "Invalid transition" },
+        },
+      },
+    },
+    "/appeals/{id}/files/{fileId}/download": {
+      get: {
+        tags: ["Appeals"],
+        summary: "Download appeal evidence file",
+        security: [{ cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true },
+          { name: "fileId", in: "path", required: true },
+        ],
+        responses: {
+          "200": { description: "Binary file content with Content-Type and Content-Disposition headers" },
+          "403": { description: "Forbidden" },
+          "404": { description: "File not found" },
         },
       },
     },
