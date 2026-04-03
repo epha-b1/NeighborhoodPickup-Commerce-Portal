@@ -2,5 +2,9 @@
 .cookiejar
 np.cookies
 *.cookies
-/.tmp/*
 node_modules
+
+# IDE and tool directories
+.claude/
+.tmp/
+.venv/
