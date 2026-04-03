@@ -174,7 +174,7 @@ describe("route authorization matrix", () => {
   it("resolves discussion thread id for authorized users", async () => {
     mockedDiscussionService.resolveThreadByContext.mockResolvedValue({
       discussionId: 99,
-      contextType: "ORDER",
+      contextType: "LISTING",
       contextId: 44,
     });
 
@@ -182,13 +182,13 @@ describe("route authorization matrix", () => {
     app.use(discussionRouter);
 
     const response = await request(app)
-      .get("/threads/resolve?contextType=ORDER&contextId=44")
-      .set("x-role", "FINANCE_CLERK");
+      .get("/threads/resolve?contextType=LISTING&contextId=44")
+      .set("x-role", "REVIEWER");
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       discussionId: 99,
-      contextType: "ORDER",
+      contextType: "LISTING",
       contextId: 44,
     });
   });

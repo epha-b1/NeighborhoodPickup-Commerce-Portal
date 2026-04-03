@@ -507,6 +507,52 @@ export const transitionAppealStatus = async (params: {
   };
 };
 
+export const getAppealFileForDownload = async (params: {
+  appealId: number;
+  fileId: number;
+  requesterUserId: number;
+  requesterRoles: string[];
+}): Promise<{
+  filePath: string;
+  originalFileName: string;
+  mimeType: string;
+} | null> => {
+  const appeal = await findAppealById(params.appealId);
+  if (!appeal) {
+    return null;
+  }
+
+  assertAppealAccess(appeal, {
+    userId: params.requesterUserId,
+    roles: params.requesterRoles,
+  });
+
+  const files = await listAppealFiles(params.appealId);
+  const file = files.find((f) => f.id === params.fileId);
+  if (!file) {
+    return null;
+  }
+
+  const absolutePath = path.resolve(process.cwd(), file.storageRelativePath);
+
+  await recordAuditLog({
+    actorUserId: params.requesterUserId,
+    action: "DOWNLOAD",
+    resourceType: "APPEAL_FILE",
+    resourceId: file.id,
+    metadata: {
+      appealId: params.appealId,
+      originalFileName: file.originalFileName,
+    },
+  });
+
+  return {
+    filePath: absolutePath,
+    originalFileName: file.originalFileName,
+    mimeType: file.mimeType,
+  };
+};
+
 export const listAppealQueue = async (params: {
   requesterUserId: number;
   requesterRoles: string[];

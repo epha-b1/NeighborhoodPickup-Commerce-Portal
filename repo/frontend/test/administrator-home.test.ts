@@ -37,6 +37,10 @@ const pendingApp = {
   fullName: "Leader Candidate",
   phone: "555-9999",
   experienceSummary: "Has managed a group for two years.",
+  governmentIdLast4: "1234",
+  certificationName: "Food Handler Certificate",
+  certificationIssuer: "State Health Dept",
+  yearsOfExperience: 5,
   pickupPointId: 3,
   requestedCommissionEligible: true,
   status: "PENDING" as const,
@@ -64,6 +68,10 @@ describe("AdministratorHomePage", () => {
 
     expect(wrapper.text()).toContain("#5");
     expect(wrapper.text()).toContain("12");
+    expect(wrapper.text()).toContain("****1234");
+    expect(wrapper.text()).toContain("Food Handler Certificate");
+    expect(wrapper.text()).toContain("State Health Dept");
+    expect(wrapper.text()).toContain("5");
     expect(wrapper.find("select").exists()).toBe(true);
     expect(wrapper.text()).toContain("Approve");
     expect(wrapper.text()).toContain("Reject");
@@ -105,7 +113,7 @@ describe("AdministratorHomePage", () => {
   });
 
   it("rejects application and sends commission eligible false", async () => {
-    const appNotEligible = { ...pendingApp, requestedCommissionEligible: false };
+    const appNotEligible = { ...pendingApp, requestedCommissionEligible: false, governmentIdLast4: null, certificationName: null, certificationIssuer: null, yearsOfExperience: null };
     getPendingApplicationsMock
       .mockResolvedValueOnce({ data: [appNotEligible] })
       .mockResolvedValueOnce({ data: [] });

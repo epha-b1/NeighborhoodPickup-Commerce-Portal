@@ -6,6 +6,10 @@ export type LeaderApplicationRecord = {
   fullName: string;
   phone: string;
   experienceSummary: string;
+  governmentIdLast4: string | null;
+  certificationName: string | null;
+  certificationIssuer: string | null;
+  yearsOfExperience: number | null;
   pickupPointId: number | null;
   requestedCommissionEligible: boolean;
   status: LeaderApplicationStatus;

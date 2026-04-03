@@ -2,65 +2,92 @@
   <section class="page-card">
     <h1>Administrator Home</h1>
     <p class="muted">
-      Manage leader onboarding decisions, commission eligibility, and risk
+      Review leader credentials, set commission eligibility, and manage risk
       controls.
     </p>
 
     <h3 style="margin-top: 1rem">Pending Leader Applications</h3>
-    <div class="table-wrap" v-if="pending.length > 0">
-      <table>
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>User</th>
-            <th>Pickup Point</th>
-            <th>Requested Commission</th>
-            <th>Submitted</th>
-            <th>Commission Eligibility</th>
-            <th>Decision</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in pending" :key="item.id">
-            <td>#{{ item.id }}</td>
-            <td>{{ item.userId }}</td>
-            <td>{{ item.pickupPointId ?? "N/A" }}</td>
-            <td>{{ item.requestedCommissionEligible ? "Yes" : "No" }}</td>
-            <td>{{ formatDate(item.submittedAt) }}</td>
-            <td>
-              <select
-                v-model="commissionEligibleById[item.id]"
-                :disabled="loadingId === item.id"
-              >
-                <option :value="true">Eligible</option>
-                <option :value="false">Not Eligible</option>
-              </select>
-            </td>
-            <td>
-              <div class="inline-actions">
-                <button
-                  @click="review(item.id, 'APPROVE')"
-                  :disabled="loadingId === item.id"
-                >
-                  Approve
-                </button>
-                <button
-                  @click="review(item.id, 'REJECT')"
-                  :disabled="loadingId === item.id"
-                >
-                  Reject
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="pending.length > 0">
+      <article
+        v-for="item in pending"
+        :key="item.id"
+        class="info-card"
+        style="margin-bottom: 1rem"
+      >
+        <div class="split-head">
+          <h3>Application #{{ item.id }} &mdash; User {{ item.userId }}</h3>
+          <span class="small-text muted">{{ formatDate(item.submittedAt) }}</span>
+        </div>
+
+        <div class="info-grid" style="margin-top: 0.5rem">
+          <div>
+            <p><strong>Full Name:</strong> {{ item.fullName }}</p>
+            <p><strong>Phone:</strong> {{ item.phone }}</p>
+            <p><strong>Pickup Point:</strong> {{ item.pickupPointId ?? "N/A" }}</p>
+            <p>
+              <strong>Requested Commission:</strong>
+              {{ item.requestedCommissionEligible ? "Yes" : "No" }}
+            </p>
+          </div>
+          <div>
+            <p>
+              <strong>Gov ID (last 4):</strong>
+              {{ item.governmentIdLast4 ? `****${item.governmentIdLast4}` : "Not provided" }}
+            </p>
+            <p>
+              <strong>Certification:</strong>
+              {{ item.certificationName || "Not provided" }}
+            </p>
+            <p>
+              <strong>Issuer:</strong>
+              {{ item.certificationIssuer || "Not provided" }}
+            </p>
+            <p>
+              <strong>Years of Experience:</strong>
+              {{ item.yearsOfExperience ?? "Not provided" }}
+            </p>
+          </div>
+        </div>
+
+        <p style="margin-top: 0.5rem">
+          <strong>Experience Summary:</strong>
+        </p>
+        <p class="comment-body">{{ item.experienceSummary }}</p>
+
+        <div class="inline-actions" style="margin-top: 0.75rem">
+          <label>
+            Commission Eligibility
+            <select
+              v-model="commissionEligibleById[item.id]"
+              :disabled="loadingId === item.id"
+            >
+              <option :value="true">Eligible</option>
+              <option :value="false">Not Eligible</option>
+            </select>
+          </label>
+          <button
+            @click="review(item.id, 'APPROVE')"
+            :disabled="loadingId === item.id"
+          >
+            Approve
+          </button>
+          <button
+            @click="review(item.id, 'REJECT')"
+            :disabled="loadingId === item.id"
+          >
+            Reject
+          </button>
+        </div>
+      </article>
     </div>
     <p v-else class="muted">No pending applications at the moment.</p>
 
     <div class="inline-actions">
       <router-link class="link-btn" to="/admin/withdrawal-blacklist"
         >Manage Withdrawal Blacklist</router-link
+      >
+      <router-link class="link-btn" to="/admin/audit-logs"
+        >Audit Logs</router-link
       >
     </div>
 

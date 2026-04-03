@@ -22,6 +22,7 @@ import AppealDraftPage from "../pages/AppealDraftPage.vue";
 import AppealStatusPage from "../pages/AppealStatusPage.vue";
 import FinanceDashboardPage from "../pages/FinanceDashboardPage.vue";
 import AdminWithdrawalBlacklistPage from "../pages/AdminWithdrawalBlacklistPage.vue";
+import AuditLogPage from "../pages/AuditLogPage.vue";
 import { useAuthStore } from "../stores/authStore";
 import type { RoleName } from "../types/auth";
 import { resolveAuthNavigation } from "./routeGuards";
@@ -158,6 +159,12 @@ const routes: RouteRecordRaw[] = [
         path: "admin/withdrawal-blacklist",
         name: "admin-withdrawal-blacklist",
         component: AdminWithdrawalBlacklistPage,
+        meta: { roles: ["ADMINISTRATOR"] },
+      },
+      {
+        path: "admin/audit-logs",
+        name: "admin-audit-logs",
+        component: AuditLogPage,
         meta: { roles: ["ADMINISTRATOR"] },
       },
     ],

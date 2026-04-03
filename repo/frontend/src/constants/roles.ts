@@ -105,6 +105,11 @@ const appNavItems: AppNavItem[] = [
     to: "/admin/withdrawal-blacklist",
     roles: ["ADMINISTRATOR"],
   },
+  {
+    label: "Audit Logs",
+    to: "/admin/audit-logs",
+    roles: ["ADMINISTRATOR"],
+  },
 ];
 
 export const resolveAppNavItems = (roles: RoleName[]): AppNavItem[] =>

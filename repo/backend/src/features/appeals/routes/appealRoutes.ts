@@ -5,6 +5,7 @@ import { sendError } from "../../../utils/apiResponse";
 import {
   createAppealRecord,
   getAppealDetail,
+  getAppealFileForDownload,
   getAppealTimeline,
   listAppealQueue,
   transitionAppealStatus,
@@ -244,6 +245,49 @@ appealRouter.get(
       }
 
       response.json(result);
+    } catch (error) {
+      if (handleAppealError(error, response)) {
+        return;
+      }
+      next(error);
+    }
+  },
+);
+
+appealRouter.get(
+  "/appeals/:id/files/:fileId/download",
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      const appealId = z.coerce
+        .number()
+        .int()
+        .positive()
+        .parse(request.params.id);
+      const fileId = z.coerce
+        .number()
+        .int()
+        .positive()
+        .parse(request.params.fileId);
+
+      const result = await getAppealFileForDownload({
+        appealId,
+        fileId,
+        requesterUserId: request.auth!.userId,
+        requesterRoles: request.auth!.roles,
+      });
+
+      if (!result) {
+        sendError(response, 404, "File not found.", "FILE_NOT_FOUND");
+        return;
+      }
+
+      response.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${result.originalFileName.replaceAll('"', '_')}"`,
+      );
+      response.setHeader("Content-Type", result.mimeType);
+      response.sendFile(result.filePath);
     } catch (error) {
       if (handleAppealError(error, response)) {
         return;

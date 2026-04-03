@@ -42,6 +42,7 @@
             <th>Size</th>
             <th>Checksum (SHA-256)</th>
             <th>Integrity</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +53,13 @@
             <td class="small-text">{{ file.checksumSha256 }}</td>
             <td>
               <strong>{{ file.integrityStatus || "UNVERIFIED" }}</strong>
+            </td>
+            <td>
+              <a
+                :href="downloadUrl(file.id)"
+                target="_blank"
+                class="link-btn"
+              >Download</a>
             </td>
           </tr>
         </tbody>
@@ -136,8 +144,11 @@ const backPath = computed(() =>
     : "/notifications",
 );
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 const formatDate = (value: string) => new Date(value).toLocaleString();
 const formatBytes = (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`;
+const downloadUrl = (fileId: number) =>
+  `${apiBaseUrl}/appeals/${appealId.value}/files/${fileId}/download`;
 
 const load = async () => {
   loading.value = true;

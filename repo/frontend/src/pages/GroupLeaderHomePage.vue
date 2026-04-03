@@ -41,6 +41,22 @@
         <input v-model="form.phone" maxlength="32" />
       </label>
       <label>
+        Government ID (last 4 digits)
+        <input v-model="form.governmentIdLast4" maxlength="4" placeholder="e.g. 1234" />
+      </label>
+      <label>
+        Certification / License Name
+        <input v-model="form.certificationName" maxlength="255" placeholder="e.g. Food Handler Certificate" />
+      </label>
+      <label>
+        Certification Issuer
+        <input v-model="form.certificationIssuer" maxlength="255" placeholder="e.g. State Health Dept" />
+      </label>
+      <label>
+        Years of Experience
+        <input v-model.number="form.yearsOfExperience" type="number" min="0" max="99" />
+      </label>
+      <label>
         Preferred Pickup Point ID (optional)
         <input v-model.number="form.pickupPointId" type="number" min="1" />
       </label>
@@ -186,6 +202,10 @@ const commissionEligibilityLabel = computed(() => {
 const form = reactive({
   fullName: '',
   phone: '',
+  governmentIdLast4: '',
+  certificationName: '',
+  certificationIssuer: '',
+  yearsOfExperience: undefined as number | undefined,
   experienceSummary: '',
   pickupPointId: undefined as number | undefined,
   requestedCommissionEligible: true
@@ -271,6 +291,10 @@ const submitApplication = async () => {
       fullName: form.fullName.trim(),
       phone: form.phone.trim(),
       experienceSummary: form.experienceSummary.trim(),
+      governmentIdLast4: form.governmentIdLast4.trim() || undefined,
+      certificationName: form.certificationName.trim() || undefined,
+      certificationIssuer: form.certificationIssuer.trim() || undefined,
+      yearsOfExperience: form.yearsOfExperience,
       pickupPointId: form.pickupPointId,
       requestedCommissionEligible: form.requestedCommissionEligible
     });

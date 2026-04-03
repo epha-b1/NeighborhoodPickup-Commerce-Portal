@@ -13,6 +13,10 @@ const createApplicationSchema = z.object({
   fullName: z.string().trim().min(3).max(120),
   phone: z.string().trim().min(6).max(32),
   experienceSummary: z.string().trim().min(20).max(4000),
+  governmentIdLast4: z.string().trim().length(4).regex(/^\d{4}$/).optional(),
+  certificationName: z.string().trim().min(2).max(255).optional(),
+  certificationIssuer: z.string().trim().min(2).max(255).optional(),
+  yearsOfExperience: z.coerce.number().int().min(0).max(99).optional(),
   pickupPointId: z.coerce.number().int().positive().optional(),
   requestedCommissionEligible: z.boolean().default(false),
 });

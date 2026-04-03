@@ -6,6 +6,10 @@ export const leaderApi = {
     fullName: string;
     phone: string;
     experienceSummary: string;
+    governmentIdLast4?: string;
+    certificationName?: string;
+    certificationIssuer?: string;
+    yearsOfExperience?: number;
     pickupPointId?: number;
     requestedCommissionEligible: boolean;
   }) =>

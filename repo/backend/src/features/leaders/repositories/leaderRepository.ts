@@ -39,6 +39,10 @@ export const getLatestApplicationByUserId = async (
       full_name: string;
       phone: string;
       experience_summary: string;
+      government_id_last4: string | null;
+      certification_name: string | null;
+      certification_issuer: string | null;
+      years_of_experience: number | null;
       pickup_point_id: number | null;
       requested_commission_eligible: number;
       status: "PENDING" | "APPROVED" | "REJECTED";
@@ -56,6 +60,10 @@ export const getLatestApplicationByUserId = async (
             la.full_name,
             la.phone,
             la.experience_summary,
+            la.government_id_last4,
+            la.certification_name,
+            la.certification_issuer,
+            la.years_of_experience,
             la.pickup_point_id,
             la.requested_commission_eligible,
             la.status,
@@ -86,6 +94,10 @@ export const getLatestApplicationByUserId = async (
     fullName: row.full_name,
     phone: row.phone,
     experienceSummary: row.experience_summary,
+    governmentIdLast4: row.government_id_last4,
+    certificationName: row.certification_name,
+    certificationIssuer: row.certification_issuer,
+    yearsOfExperience: row.years_of_experience,
     pickupPointId: row.pickup_point_id,
     requestedCommissionEligible: row.requested_commission_eligible === 1,
     status: row.status,
@@ -108,13 +120,17 @@ export const createLeaderApplication = async (params: {
 }): Promise<LeaderApplicationRecord> => {
   await dbPool.query(
     `INSERT INTO leader_applications
-      (user_id, full_name, phone, experience_summary, pickup_point_id, requested_commission_eligible, status)
-     VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`,
+      (user_id, full_name, phone, experience_summary, government_id_last4, certification_name, certification_issuer, years_of_experience, pickup_point_id, requested_commission_eligible, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
     [
       params.userId,
       params.input.fullName,
       params.input.phone,
       params.input.experienceSummary,
+      params.input.governmentIdLast4 ?? null,
+      params.input.certificationName ?? null,
+      params.input.certificationIssuer ?? null,
+      params.input.yearsOfExperience ?? null,
       params.input.pickupPointId ?? null,
       params.input.requestedCommissionEligible ? 1 : 0,
     ],
@@ -138,6 +154,10 @@ export const listPendingApplications = async (): Promise<
       full_name: string;
       phone: string;
       experience_summary: string;
+      government_id_last4: string | null;
+      certification_name: string | null;
+      certification_issuer: string | null;
+      years_of_experience: number | null;
       pickup_point_id: number | null;
       requested_commission_eligible: number;
       status: "PENDING" | "APPROVED" | "REJECTED";
@@ -150,6 +170,10 @@ export const listPendingApplications = async (): Promise<
             full_name,
             phone,
             experience_summary,
+            government_id_last4,
+            certification_name,
+            certification_issuer,
+            years_of_experience,
             pickup_point_id,
             requested_commission_eligible,
             status,
@@ -166,6 +190,10 @@ export const listPendingApplications = async (): Promise<
     fullName: row.full_name,
     phone: row.phone,
     experienceSummary: row.experience_summary,
+    governmentIdLast4: row.government_id_last4,
+    certificationName: row.certification_name,
+    certificationIssuer: row.certification_issuer,
+    yearsOfExperience: row.years_of_experience,
     pickupPointId: row.pickup_point_id,
     requestedCommissionEligible: row.requested_commission_eligible === 1,
     status: row.status,
