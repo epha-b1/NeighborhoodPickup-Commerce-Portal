@@ -49,11 +49,13 @@
         v-for="comment in comments"
         :key="comment.id"
         :comment="comment"
+        :can-unhide="canUnhide"
         @reply="onReply"
         @quote="onQuote"
         @flag="onFlag"
         @appeal="onAppeal"
         @vote="onVote"
+        @unhide="onUnhide"
       />
     </div>
 
@@ -104,6 +106,9 @@ const replyToId = ref<number | undefined>();
 const quotedCommentId = ref<number | undefined>();
 const reviewMessage = ref("");
 
+const canUnhide = computed(() =>
+  authStore.roles.some((r: string) => r === "REVIEWER" || r === "ADMINISTRATOR"),
+);
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / 20)));
 const backPath = computed(() => {
   if (
@@ -203,6 +208,16 @@ const onAppeal = async (commentId: number) => {
       commentId: String(commentId),
     },
   });
+};
+
+const onUnhide = async (commentId: number) => {
+  try {
+    await discussionApi.unhideComment(commentId, "Restored by moderator review");
+    await loadThread();
+  } catch (err) {
+    error.value =
+      err instanceof Error ? err.message : "Failed to unhide comment.";
+  }
 };
 
 const onVote = async (commentId: number) => {

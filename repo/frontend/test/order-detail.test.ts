@@ -162,4 +162,63 @@ describe("OrderDetailPage", () => {
 
     expect(wrapper.text()).toContain("Order not found");
   });
+
+  it("renders line item details with quantity and pricing breakdown", async () => {
+    getOrderMock.mockResolvedValue(sampleOrder);
+
+    const wrapper = mount(OrderDetailPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("$9.99");
+    expect(wrapper.text()).toContain("3");
+    expect(wrapper.text()).toContain("$29.97");
+  });
+
+  it("shows pickup window date and time range", async () => {
+    getOrderMock.mockResolvedValue(sampleOrder);
+
+    const wrapper = mount(OrderDetailPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("2026-04-05");
+    expect(wrapper.text()).toContain("10:00:00");
+    expect(wrapper.text()).toContain("11:00:00");
+  });
+
+  it("displays discount and subsidy breakdown in totals", async () => {
+    getOrderMock.mockResolvedValue(sampleOrder);
+
+    const wrapper = mount(OrderDetailPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("$2.00");
+    expect(wrapper.text()).toContain("$1.00");
+    expect(wrapper.text()).toContain("$2.16");
+  });
+
+  it("renders appeal link with correct order source parameters", async () => {
+    getOrderMock.mockResolvedValue(sampleOrder);
+
+    const wrapper = mount(OrderDetailPage, {
+      global: {
+        stubs: {
+          RouterLink: {
+            template: '<a :to="to"><slot /></a>',
+            props: ["to"],
+          },
+        },
+      },
+    });
+    await flush();
+
+    const html = wrapper.html();
+    expect(html).toContain("source=order-detail");
+    expect(html).toContain("orderId=42");
+  });
 });

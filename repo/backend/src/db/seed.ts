@@ -1,6 +1,7 @@
 import { ROLE_NAMES, type RoleName } from '../auth/roles';
 import { hashPassword } from '../auth/passwordHash';
 import { isPasswordPolicyValid, passwordPolicyMessage } from '../auth/passwordPolicy';
+import { assertValidPickupWindowDuration } from '../features/commerce/repositories/pickupPointRepository';
 import { dbPool } from './pool';
 
 type SeedUser = { username: string; role: RoleName; password: string };
@@ -119,14 +120,25 @@ const ensurePickupWindows = async (pickupPointId: number): Promise<void> => {
     return;
   }
 
+  // Validate that all seed windows comply with 1-hour local-time rule.
+  const seedWindows = [
+    { start: '09:00:00', end: '10:00:00' },
+    { start: '10:00:00', end: '11:00:00' },
+    { start: '09:00:00', end: '10:00:00' },
+    { start: '13:00:00', end: '14:00:00' },
+  ];
+  for (const w of seedWindows) {
+    assertValidPickupWindowDuration(w.start, w.end);
+  }
+
   await dbPool.query(
     `INSERT INTO pickup_windows
       (pickup_point_id, window_date, start_time, end_time, capacity_total, reserved_slots)
      VALUES
-      (?, UTC_DATE(), '09:00:00', '11:00:00', 50, 35),
-      (?, UTC_DATE(), '11:00:00', '13:00:00', 50, 50),
-      (?, DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '09:00:00', '11:00:00', 60, 20),
-      (?, DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '13:00:00', '15:00:00', 60, 10)`,
+      (?, UTC_DATE(), '09:00:00', '10:00:00', 50, 35),
+      (?, UTC_DATE(), '10:00:00', '11:00:00', 50, 50),
+      (?, DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '09:00:00', '10:00:00', 60, 20),
+      (?, DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '13:00:00', '14:00:00', 60, 10)`,
     [pickupPointId, pickupPointId, pickupPointId, pickupPointId]
   );
 

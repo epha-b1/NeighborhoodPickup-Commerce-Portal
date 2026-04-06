@@ -3,9 +3,11 @@ import request from "supertest";
 
 import { appealRouter } from "../../src/features/appeals/routes/appealRoutes";
 import { auditRouter } from "../../src/features/audit/routes/auditRoutes";
+import { commerceRouter } from "../../src/features/commerce/routes/commerceRoutes";
 import { discussionRouter } from "../../src/features/discussions/routes/discussionRoutes";
 import * as appealService from "../../src/features/appeals/services/appealService";
 import * as auditService from "../../src/features/audit/services/auditService";
+import * as commerceService from "../../src/features/commerce/services/commerceService";
 import * as discussionService from "../../src/features/discussions/services/discussionService";
 
 vi.mock("../../src/features/appeals/services/appealService", () => ({
@@ -24,6 +26,7 @@ vi.mock("../../src/features/discussions/services/discussionService", () => ({
   resolveThreadByContext: vi.fn(),
   listUserNotifications: vi.fn(),
   patchNotificationReadState: vi.fn(),
+  unhideComment: vi.fn(),
 }));
 
 vi.mock("../../src/features/audit/services/auditService", () => ({
@@ -32,7 +35,16 @@ vi.mock("../../src/features/audit/services/auditService", () => ({
   verifyAuditChain: vi.fn(),
 }));
 
+vi.mock("../../src/features/commerce/services/commerceService", () => ({
+  createPickupWindowService: vi.fn(),
+  getPickupPointDetail: vi.fn(),
+  listActiveBuyingCycles: vi.fn(),
+  listListings: vi.fn(),
+  toggleFavoriteTarget: vi.fn(),
+}));
+
 const mockedAppealService = vi.mocked(appealService);
+const mockedCommerceService = vi.mocked(commerceService);
 const mockedDiscussionService = vi.mocked(discussionService);
 const mockedAuditService = vi.mocked(auditService);
 
@@ -242,7 +254,8 @@ describe("route authorization matrix", () => {
       .set("x-role", "ADMINISTRATOR");
 
     expect(searchResponse.status).toBe(200);
-    expect(searchResponse.body.total).toBe(1);
+    expect(searchResponse.body.success).toBe(true);
+    expect(searchResponse.body.data.total).toBe(1);
 
     const exportResponse = await request(app)
       .get("/audit/logs/export?page=1&pageSize=20")
@@ -251,5 +264,219 @@ describe("route authorization matrix", () => {
     expect(exportResponse.status).toBe(200);
     expect(exportResponse.headers["content-type"]).toContain("text/csv");
     expect(exportResponse.text).toContain("id,actor_user_id");
+  });
+
+  // --- Commerce route object-level authorization ---
+
+  it("requires authentication for listings endpoint", async () => {
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app).get("/listings?cycleId=1");
+
+    expect(response.status).toBe(401);
+    expect(mockedCommerceService.listListings).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication for pickup point detail endpoint", async () => {
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app).get("/pickup-points/5");
+
+    expect(response.status).toBe(401);
+    expect(mockedCommerceService.getPickupPointDetail).not.toHaveBeenCalled();
+  });
+
+  it("passes user context to listings service for object-level access", async () => {
+    mockedCommerceService.listListings.mockResolvedValue({
+      total: 1,
+      rows: [
+        {
+          id: 9,
+          cycleId: 1,
+          pickupPointId: 3,
+          pickupPointName: "Point A",
+          leaderUserId: 7,
+          leaderUsername: "leader1",
+          title: "Kale",
+          description: "Fresh",
+          basePrice: 5.99,
+          unitLabel: "bundle",
+          availableQuantity: 20,
+          reservedQuantity: 5,
+          isFavoritePickupPoint: true,
+          isFavoriteLeader: false,
+        },
+      ],
+    });
+
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .get("/listings?cycleId=1")
+      .set("x-role", "MEMBER")
+      .set("x-user-id", "15");
+
+    expect(response.status).toBe(200);
+    expect(mockedCommerceService.listListings).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 15 }),
+    );
+  });
+
+  it("returns 404 when pickup point is not found", async () => {
+    mockedCommerceService.getPickupPointDetail.mockResolvedValue(null);
+
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .get("/pickup-points/999")
+      .set("x-role", "MEMBER")
+      .set("x-user-id", "15");
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("PICKUP_POINT_NOT_FOUND");
+  });
+
+  it("passes user context to pickup point detail for personalized response", async () => {
+    mockedCommerceService.getPickupPointDetail.mockResolvedValue({
+      id: 5,
+      name: "Central Park Pickup",
+      address: "123 Main St",
+      businessHours: { mon: "9-5", tue: "9-5" },
+      dailyCapacity: 50,
+      remainingCapacityToday: 30,
+      windows: [],
+      isFavorite: true,
+    });
+
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .get("/pickup-points/5")
+      .set("x-role", "MEMBER")
+      .set("x-user-id", "15");
+
+    expect(response.status).toBe(200);
+    expect(mockedCommerceService.getPickupPointDetail).toHaveBeenCalledWith({
+      userId: 15,
+      pickupPointId: 5,
+    });
+    expect(response.body.data.isFavorite).toBe(true);
+  });
+
+  // --- Admin pickup window creation with 1-hour duration enforcement ---
+
+  it("rejects non-admin from creating pickup windows", async () => {
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .post("/admin/pickup-windows")
+      .set("x-role", "MEMBER")
+      .send({
+        pickupPointId: 1,
+        windowDate: "2026-05-01",
+        startTime: "09:00:00",
+        endTime: "10:00:00",
+        capacityTotal: 50,
+      });
+
+    expect(response.status).toBe(403);
+    expect(mockedCommerceService.createPickupWindowService).not.toHaveBeenCalled();
+  });
+
+  it("allows admin to create a valid 1-hour pickup window", async () => {
+    mockedCommerceService.createPickupWindowService.mockResolvedValue({ id: 42 });
+
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .post("/admin/pickup-windows")
+      .set("x-role", "ADMINISTRATOR")
+      .send({
+        pickupPointId: 1,
+        windowDate: "2026-05-01",
+        startTime: "09:00:00",
+        endTime: "10:00:00",
+        capacityTotal: 50,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.id).toBe(42);
+  });
+
+  it("rejects pickup window with invalid 2-hour duration at route level", async () => {
+    mockedCommerceService.createPickupWindowService.mockRejectedValue(
+      new Error("INVALID_PICKUP_WINDOW_DURATION"),
+    );
+
+    const app = withAuth();
+    app.use(commerceRouter);
+
+    const response = await request(app)
+      .post("/admin/pickup-windows")
+      .set("x-role", "ADMINISTRATOR")
+      .send({
+        pickupPointId: 1,
+        windowDate: "2026-05-01",
+        startTime: "09:00:00",
+        endTime: "11:00:00",
+        capacityTotal: 50,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_PICKUP_WINDOW_DURATION");
+  });
+
+  // --- Discussion RBAC: FINANCE_CLERK rejection ---
+
+  it("rejects FINANCE_CLERK on discussion thread comments endpoint", async () => {
+    const app = withAuth();
+    app.use(discussionRouter);
+
+    const response = await request(app)
+      .get("/threads/7/comments")
+      .set("x-role", "FINANCE_CLERK");
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("ROLE_FORBIDDEN");
+    expect(mockedDiscussionService.getThreadComments).not.toHaveBeenCalled();
+  });
+
+  it("rejects FINANCE_CLERK on comment creation endpoint", async () => {
+    const app = withAuth();
+    app.use(discussionRouter);
+
+    const response = await request(app)
+      .post("/comments")
+      .set("x-role", "FINANCE_CLERK")
+      .send({
+        contextType: "LISTING",
+        contextId: 1,
+        body: "This should be rejected",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("ROLE_FORBIDDEN");
+    expect(mockedDiscussionService.createThreadComment).not.toHaveBeenCalled();
+  });
+
+  it("rejects FINANCE_CLERK on notification endpoint", async () => {
+    const app = withAuth();
+    app.use(discussionRouter);
+
+    const response = await request(app)
+      .get("/notifications")
+      .set("x-role", "FINANCE_CLERK");
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("ROLE_FORBIDDEN");
+    expect(mockedDiscussionService.listUserNotifications).not.toHaveBeenCalled();
   });
 });

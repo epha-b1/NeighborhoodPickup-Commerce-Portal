@@ -1,0 +1,3 @@
+ALTER TABLE buying_cycles
+  DROP COLUMN closed_at,
+  MODIFY COLUMN status ENUM('DRAFT', 'ACTIVE', 'CLOSED') NOT NULL DEFAULT 'DRAFT';

@@ -1,0 +1,14 @@
+# Local cookie/session artifacts
+.cookiejar
+np.cookies
+*.cookies
+node_modules
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# IDE and tool directories
+.claude/
+.tmp/
+.venv/

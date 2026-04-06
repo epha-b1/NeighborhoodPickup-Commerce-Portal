@@ -17,7 +17,7 @@ describe('capacity service', () => {
         pickup_point_id: 2,
         window_date: '2026-03-26',
         start_time: '09:00:00',
-        end_time: '11:00:00',
+        end_time: '10:00:00',
         capacity_total: 50,
         reserved_slots: 49
       }
@@ -35,7 +35,7 @@ describe('capacity service', () => {
         windowId: 1,
         date: '2026-03-26',
         startTime: '09:00:00',
-        endTime: '11:00:00',
+        endTime: '10:00:00',
         capacityTotal: 40,
         reservedSlots: 38,
         remainingCapacity: 2
@@ -50,7 +50,7 @@ describe('capacity service', () => {
         pickup_point_id: 2,
         window_date: '2026-03-26',
         start_time: '11:00:00',
-        end_time: '13:00:00',
+        end_time: '12:00:00',
         capacity_total: 30,
         reserved_slots: 33
       }

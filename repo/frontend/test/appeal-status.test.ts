@@ -184,4 +184,107 @@ describe("AppealStatusPage", () => {
 
     expect(transitionStatusMock).toHaveBeenCalledWith(7, "INVESTIGATION", "Beginning investigation");
   });
+
+  it("shows Move to Ruling button when appeal is in INVESTIGATION status", async () => {
+    const investigationAppeal = { ...baseAppeal, status: "INVESTIGATION" as const };
+    const investigationTimeline = [
+      ...baseTimeline,
+      {
+        id: 2,
+        appealId: 7,
+        fromStatus: "INTAKE",
+        toStatus: "INVESTIGATION",
+        note: "Started investigation",
+        changedByUserId: 99,
+        createdAt: "2026-04-02T10:00:00.000Z",
+      },
+    ];
+
+    getAppealMock.mockResolvedValue(investigationAppeal);
+    getTimelineMock.mockResolvedValue({
+      appealId: 7,
+      status: "INVESTIGATION",
+      data: investigationTimeline,
+    });
+
+    const wrapper = mount(AppealStatusPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("INVESTIGATION");
+    const rulingBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Move to Ruling"));
+    expect(rulingBtn).toBeDefined();
+  });
+
+  it("transitions appeal from INVESTIGATION to RULING", async () => {
+    const investigationAppeal = { ...baseAppeal, status: "INVESTIGATION" as const };
+    const rulingAppeal = { ...baseAppeal, status: "RULING" as const };
+
+    getAppealMock
+      .mockResolvedValueOnce(investigationAppeal)
+      .mockResolvedValueOnce(rulingAppeal);
+
+    getTimelineMock
+      .mockResolvedValueOnce({
+        appealId: 7,
+        status: "INVESTIGATION",
+        data: [
+          ...baseTimeline,
+          { id: 2, appealId: 7, fromStatus: "INTAKE", toStatus: "INVESTIGATION", note: "Started", changedByUserId: 99, createdAt: "2026-04-02T10:00:00.000Z" },
+        ],
+      })
+      .mockResolvedValueOnce({
+        appealId: 7,
+        status: "RULING",
+        data: [
+          ...baseTimeline,
+          { id: 2, appealId: 7, fromStatus: "INTAKE", toStatus: "INVESTIGATION", note: "Started", changedByUserId: 99, createdAt: "2026-04-02T10:00:00.000Z" },
+          { id: 3, appealId: 7, fromStatus: "INVESTIGATION", toStatus: "RULING", note: "Evidence reviewed", changedByUserId: 99, createdAt: "2026-04-03T10:00:00.000Z" },
+        ],
+      });
+
+    transitionStatusMock.mockResolvedValue({
+      appealId: 7,
+      fromStatus: "INVESTIGATION",
+      toStatus: "RULING",
+    });
+
+    const wrapper = mount(AppealStatusPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    await wrapper.find('input[placeholder="Add transition reason"]').setValue("Evidence reviewed");
+    const rulingBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Move to Ruling"));
+    await rulingBtn!.trigger("click");
+    await flush();
+
+    expect(transitionStatusMock).toHaveBeenCalledWith(7, "RULING", "Evidence reviewed");
+  });
+
+  it("displays file integrity status in appeal details", async () => {
+    const appealWithTamperedFile = {
+      ...baseAppeal,
+      files: [
+        {
+          ...baseAppeal.files[0],
+          integrityStatus: "TAMPERED" as const,
+        },
+      ],
+    };
+    getAppealMock.mockResolvedValue(appealWithTamperedFile);
+    getTimelineMock.mockResolvedValue({ appealId: 7, status: "INTAKE", data: baseTimeline });
+
+    const wrapper = mount(AppealStatusPage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("TAMPERED");
+  });
 });

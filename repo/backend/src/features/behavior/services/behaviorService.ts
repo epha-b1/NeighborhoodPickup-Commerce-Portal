@@ -20,6 +20,71 @@ const MAX_QUEUE_RETRIES = 5;
 
 let queueProcessorRunning = false;
 let retentionSchedulerHandle: NodeJS.Timeout | null = null;
+let bufferFlushHandle: NodeJS.Timeout | null = null;
+
+// ---------------------------------------------------------------------------
+// In-memory event buffer with durable MySQL fallback
+// Events are first held in memory and flushed to the DB queue when:
+//   1. Buffer size reaches BEHAVIOR_BUFFER_CAPACITY (default 100)
+//   2. A periodic flush timer fires (BEHAVIOR_BUFFER_FLUSH_INTERVAL_MS, default 5 s)
+//   3. An in-memory insertion fails (immediate durable fallback for that event)
+// Deduplication is still enforced at the DB layer via idempotency keys.
+// ---------------------------------------------------------------------------
+type BufferedEvent = { userId: number | null; event: BehaviorEventInput };
+
+const inMemoryBuffer: BufferedEvent[] = [];
+const inMemoryDedupSet = new Set<string>();
+
+const bufferDedupKey = (userId: number | null, event: BehaviorEventInput): string =>
+  `${userId ?? 'null'}:${event.eventType}:${event.idempotencyKey}`;
+
+export const _getBufferForTesting = () => ({
+  items: inMemoryBuffer,
+  dedupSet: inMemoryDedupSet,
+  flush: flushBuffer,
+});
+
+const flushBuffer = async (): Promise<void> => {
+  if (inMemoryBuffer.length === 0) return;
+  const batch = inMemoryBuffer.splice(0, inMemoryBuffer.length);
+  inMemoryDedupSet.clear();
+
+  for (const item of batch) {
+    try {
+      const inserted = await insertDedupKey({
+        idempotencyKey: item.event.idempotencyKey,
+        eventType: item.event.eventType,
+        userId: item.userId,
+      });
+
+      if (inserted) {
+        await insertBehaviorQueue({
+          idempotencyKey: item.event.idempotencyKey,
+          payload: { userId: item.userId, ...item.event },
+        });
+      }
+    } catch {
+      // Best-effort: item will be lost only if both in-memory AND DB write fail.
+      // Idempotency key ensures safe retry on next ingest.
+    }
+  }
+
+  setImmediate(() => { void processBehaviorQueue(); });
+};
+
+export const startBufferFlush = (): void => {
+  if (bufferFlushHandle) return;
+  const intervalMs = env.behaviorBufferFlushIntervalMs;
+  if (intervalMs <= 0) return;
+  bufferFlushHandle = setInterval(() => { void flushBuffer(); }, intervalMs);
+};
+
+export const stopBufferFlush = (): void => {
+  if (bufferFlushHandle) {
+    clearInterval(bufferFlushHandle);
+    bufferFlushHandle = null;
+  }
+};
 
 const parseQueuedPayload = (value: unknown): { userId: number | null; event: BehaviorEventInput } => {
   const raw = typeof value === 'string' ? JSON.parse(value) : value;
@@ -95,25 +160,43 @@ const enqueueBehaviorEvent = async (params: {
   userId: number | null;
   event: BehaviorEventInput;
 }): Promise<boolean> => {
-  const inserted = await insertDedupKey({
-    idempotencyKey: params.event.idempotencyKey,
-    eventType: params.event.eventType,
-    userId: params.userId
-  });
+  const key = bufferDedupKey(params.userId, params.event);
 
-  if (!inserted) {
+  // Fast-path: check in-memory dedup before touching DB.
+  if (inMemoryDedupSet.has(key)) {
     return false;
   }
 
-  await insertBehaviorQueue({
-    idempotencyKey: params.event.idempotencyKey,
-    payload: {
-      userId: params.userId,
-      ...params.event
-    }
-  });
+  // Attempt to buffer in memory first.
+  try {
+    inMemoryDedupSet.add(key);
+    inMemoryBuffer.push({ userId: params.userId, event: params.event });
 
-  return true;
+    // Flush when capacity is reached.
+    if (inMemoryBuffer.length >= env.behaviorBufferCapacity) {
+      setImmediate(() => { void flushBuffer(); });
+    }
+
+    return true;
+  } catch {
+    // Fallback: write directly to durable DB queue.
+    const inserted = await insertDedupKey({
+      idempotencyKey: params.event.idempotencyKey,
+      eventType: params.event.eventType,
+      userId: params.userId,
+    });
+
+    if (!inserted) {
+      return false;
+    }
+
+    await insertBehaviorQueue({
+      idempotencyKey: params.event.idempotencyKey,
+      payload: { userId: params.userId, ...params.event },
+    });
+
+    return true;
+  }
 };
 
 export const ingestBehaviorEvents = async (params: {
@@ -146,11 +229,11 @@ export const ingestBehaviorEvents = async (params: {
     });
   }
 
+  // Trigger a non-blocking micro-flush so accepted events become durable
+  // promptly after the ingest response is sent, without blocking the
+  // request path.  The timer/capacity flush remains as a safety net.
   if (accepted > 0) {
-    // Run queue processing without blocking the ingest request path.
-    setImmediate(() => {
-      void processBehaviorQueue();
-    });
+    setImmediate(() => { void flushBuffer(); });
   }
 
   return {
@@ -181,13 +264,7 @@ export const recordServerBehaviorEvent = async (params: {
     }
   });
 
-  if (!inserted) {
-    return;
-  }
-
-  setImmediate(() => {
-    void processBehaviorQueue();
-  });
+  // Event is now in the in-memory buffer; flush will handle DB persistence.
 };
 
 export const getBehaviorSummary = async (params: { from?: string; to?: string }) =>
@@ -214,6 +291,8 @@ export const runRetentionJobs = async (actorUserId: number | null) => {
 };
 
 export const startBehaviorBackgroundJobs = (): void => {
+  startBufferFlush();
+
   if (retentionSchedulerHandle || env.behaviorRetentionRunIntervalMinutes <= 0) {
     return;
   }

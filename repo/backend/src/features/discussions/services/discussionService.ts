@@ -12,6 +12,7 @@ import {
   getOrCreateDiscussion,
   getThreadCommentsPage,
   isOrderOwnedByUser,
+  setCommentVisible,
   updateNotificationReadState,
 } from "../repositories/discussionRepository";
 import type {
@@ -326,4 +327,51 @@ export const patchNotificationReadState = async (params: {
   readState: "READ" | "UNREAD";
 }) => {
   return updateNotificationReadState(params);
+};
+
+const unhideAllowedRoles = new Set<RoleName>(["REVIEWER", "ADMINISTRATOR"]);
+
+export const unhideComment = async (params: {
+  commentId: number;
+  actorUserId: number;
+  roles: RoleName[];
+  reason: string;
+}) => {
+  if (!params.roles.some((role) => unhideAllowedRoles.has(role))) {
+    throw new Error("UNHIDE_FORBIDDEN");
+  }
+
+  const comment = await findCommentById(params.commentId);
+  if (!comment) {
+    throw new Error("COMMENT_NOT_FOUND");
+  }
+
+  if (!comment.isHidden) {
+    throw new Error("COMMENT_NOT_HIDDEN");
+  }
+
+  const unhideReason = `Unhidden by moderator: ${params.reason}`;
+  await setCommentVisible({ commentId: params.commentId, reason: unhideReason });
+
+  await recordAuditLog({
+    actorUserId: params.actorUserId,
+    action: "PERMISSION_CHANGE",
+    resourceType: "DISCUSSION_COMMENT",
+    resourceId: params.commentId,
+    metadata: {
+      action: "UNHIDE",
+      reason: params.reason,
+    },
+  });
+
+  logger.info("discussion.comment.unhidden", "Comment unhidden by moderator", {
+    commentId: params.commentId,
+    actorUserId: params.actorUserId,
+  });
+
+  return {
+    commentId: params.commentId,
+    isHidden: false,
+    reason: unhideReason,
+  };
 };

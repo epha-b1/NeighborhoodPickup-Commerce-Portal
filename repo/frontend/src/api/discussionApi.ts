@@ -66,4 +66,12 @@ export const discussionApi = {
         body: JSON.stringify({ readState }),
       },
     ),
+  unhideComment: (commentId: number, reason: string) =>
+    apiRequest<{ commentId: number; isHidden: boolean; reason: string }>(
+      `/comments/${commentId}/visibility`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ reason }),
+      },
+    ),
 };

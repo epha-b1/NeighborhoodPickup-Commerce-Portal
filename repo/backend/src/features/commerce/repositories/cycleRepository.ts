@@ -1,5 +1,67 @@
 import { dbPool } from '../../../db/pool';
-import type { ActiveCycle } from '../types';
+import type { ActiveCycle, BuyingCycleStatus } from '../types';
+
+const VALID_TRANSITIONS: Record<BuyingCycleStatus, BuyingCycleStatus[]> = {
+  DRAFT: ['ACTIVE'],
+  ACTIVE: ['CLOSED'],
+  CLOSED: ['FULFILLED'],
+  FULFILLED: ['ARCHIVED'],
+  ARCHIVED: [],
+};
+
+export const getCycleById = async (
+  cycleId: number,
+): Promise<{ id: number; status: BuyingCycleStatus; endsAt: string } | null> => {
+  const [rows] = await dbPool.query<
+    { id: number; status: BuyingCycleStatus; ends_at: Date | string }[]
+  >(
+    'SELECT id, status, ends_at FROM buying_cycles WHERE id = ? LIMIT 1',
+    [cycleId],
+  );
+  if (rows.length === 0) return null;
+  return {
+    id: rows[0].id,
+    status: rows[0].status,
+    endsAt: new Date(rows[0].ends_at).toISOString(),
+  };
+};
+
+export const transitionCycleStatus = async (params: {
+  cycleId: number;
+  toStatus: BuyingCycleStatus;
+}): Promise<{ cycleId: number; fromStatus: BuyingCycleStatus; toStatus: BuyingCycleStatus }> => {
+  const cycle = await getCycleById(params.cycleId);
+  if (!cycle) {
+    throw new Error('CYCLE_NOT_FOUND');
+  }
+
+  const allowed = VALID_TRANSITIONS[cycle.status];
+  if (!allowed.includes(params.toStatus)) {
+    throw new Error('INVALID_CYCLE_TRANSITION');
+  }
+
+  const closedAtClause = params.toStatus === 'CLOSED' ? ', closed_at = UTC_TIMESTAMP()' : '';
+  await dbPool.query(
+    `UPDATE buying_cycles SET status = ?${closedAtClause} WHERE id = ?`,
+    [params.toStatus, params.cycleId],
+  );
+
+  return {
+    cycleId: params.cycleId,
+    fromStatus: cycle.status,
+    toStatus: params.toStatus,
+  };
+};
+
+export const isCycleActiveForCheckout = async (cycleId: number): Promise<boolean> => {
+  const [rows] = await dbPool.query<{ ok: number }[]>(
+    `SELECT 1 AS ok FROM buying_cycles
+     WHERE id = ? AND status = 'ACTIVE' AND UTC_TIMESTAMP() BETWEEN starts_at AND ends_at
+     LIMIT 1`,
+    [cycleId],
+  );
+  return rows.length > 0;
+};
 
 export const getActiveCycles = async (params: {
   page: number;

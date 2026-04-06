@@ -433,6 +433,22 @@ export const getNotifications = async (params: {
   };
 };
 
+export const setCommentVisible = async (params: {
+  commentId: number;
+  reason: string;
+}): Promise<boolean> => {
+  const [result] = await dbPool.query<any>(
+    `UPDATE comments
+     SET is_hidden = 0,
+         hidden_reason = ?
+     WHERE id = ?
+       AND is_hidden = 1`,
+    [params.reason, params.commentId],
+  );
+
+  return Number(result.affectedRows ?? 0) > 0;
+};
+
 export const updateNotificationReadState = async (params: {
   userId: number;
   notificationId: number;

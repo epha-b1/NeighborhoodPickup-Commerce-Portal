@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { requireAuth, requireRoles } from "../../../middleware/rbac";
+import { sendError, sendSuccess } from "../../../utils/apiResponse";
 import {
   getAuditExportCsv,
   getAuditSearch,
@@ -30,9 +31,7 @@ const querySchema = z.object({
 
 const handleAuditError = (error: unknown, response: Response): boolean => {
   if (error instanceof z.ZodError) {
-    response
-      .status(400)
-      .json({ error: "Invalid query.", details: error.issues });
+    sendError(response, 400, "Invalid query.", "INVALID_REQUEST_PAYLOAD", error.issues);
     return true;
   }
   return false;
@@ -48,7 +47,7 @@ auditRouter.get(
     try {
       const query = querySchema.parse(request.query);
       const result = await getAuditSearch(query);
-      response.json({
+      sendSuccess(response, {
         page: query.page,
         pageSize: query.pageSize,
         total: result.total,
@@ -93,7 +92,7 @@ auditRouter.get(
   async (_request, response, next) => {
     try {
       const result = await verifyAuditChain();
-      response.json(result);
+      sendSuccess(response, result);
     } catch (error) {
       next(error);
     }

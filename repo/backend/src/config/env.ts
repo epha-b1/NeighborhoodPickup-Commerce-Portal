@@ -82,6 +82,12 @@ export const env = {
   behaviorRetentionRunIntervalMinutes: Number(
     process.env.BEHAVIOR_RETENTION_RUN_INTERVAL_MINUTES ?? 0,
   ),
+  behaviorBufferCapacity: Number(
+    process.env.BEHAVIOR_BUFFER_CAPACITY ?? 100,
+  ),
+  behaviorBufferFlushIntervalMs: Number(
+    process.env.BEHAVIOR_BUFFER_FLUSH_INTERVAL_MS ?? 5000,
+  ),
   dataEncryptionKey: getEnv(
     "DATA_ENCRYPTION_KEY",
     "local-dev-data-encryption-key-change-me",

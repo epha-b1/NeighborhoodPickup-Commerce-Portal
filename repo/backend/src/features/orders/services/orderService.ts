@@ -15,6 +15,7 @@ import type {
   OrderQuoteInput,
   PricingQuote,
 } from "../types";
+import { isCycleActiveForCheckout } from "../../commerce/repositories/cycleRepository";
 import { recordServerBehaviorEvent } from "../../behavior/services/behaviorService";
 import { logger } from "../../../utils/logger";
 
@@ -103,6 +104,15 @@ export const checkoutOrder = async (params: {
   userId: number;
   input: OrderQuoteInput;
 }): Promise<CheckoutResult> => {
+  const cycleActive = await isCycleActiveForCheckout(params.input.cycleId);
+  if (!cycleActive) {
+    return {
+      ok: false,
+      code: "CYCLE_NOT_ACTIVE",
+      message: "The buying cycle is no longer active or has expired.",
+    };
+  }
+
   try {
     const quote = await quoteOrder(params.input);
 

@@ -1,13 +1,18 @@
 import * as repository from '../../src/features/orders/data/orderRepository';
 import { checkoutOrder } from '../../src/features/orders/services/orderService';
+import * as cycleRepo from '../../src/features/commerce/repositories/cycleRepository';
 
 vi.mock('../../src/features/orders/data/orderRepository');
+vi.mock('../../src/features/commerce/repositories/cycleRepository');
+
+const mockedCycleRepo = vi.mocked(cycleRepo);
 
 const repo = vi.mocked(repository);
 
 describe('checkout service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedCycleRepo.isCycleActiveForCheckout.mockResolvedValue(true);
   });
 
   it('returns capacity conflict with alternatives when window is full', async () => {
@@ -31,7 +36,7 @@ describe('checkout service', () => {
       pickupPointId: 2,
       windowDate: '2026-03-27',
       startTime: '09:00:00',
-      endTime: '11:00:00',
+      endTime: '10:00:00',
       capacityTotal: 10,
       reservedSlots: 10
     });
@@ -39,8 +44,8 @@ describe('checkout service', () => {
       {
         pickupWindowId: 6,
         windowDate: '2026-03-27',
-        startTime: '11:00:00',
-        endTime: '13:00:00',
+        startTime: '10:00:00',
+        endTime: '11:00:00',
         remainingCapacity: 2
       }
     ]);
@@ -85,7 +90,7 @@ describe('checkout service', () => {
       pickupPointId: 2,
       windowDate: '2026-03-27',
       startTime: '09:00:00',
-      endTime: '11:00:00',
+      endTime: '10:00:00',
       capacityTotal: 10,
       reservedSlots: 3
     });
@@ -110,6 +115,27 @@ describe('checkout service', () => {
     expect(repo.createOrderTransaction).toHaveBeenCalled();
   });
 
+  it('returns CYCLE_NOT_ACTIVE when buying cycle is expired or not active', async () => {
+    mockedCycleRepo.isCycleActiveForCheckout.mockResolvedValue(false);
+
+    const result = await checkoutOrder({
+      userId: 8,
+      input: {
+        cycleId: 3,
+        pickupPointId: 2,
+        pickupWindowId: 5,
+        taxJurisdictionCode: 'US-IL-SPRINGFIELD',
+        items: [{ listingId: 1, quantity: 2 }]
+      }
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('CYCLE_NOT_ACTIVE');
+    }
+    expect(repo.getPickupWindowCapacity).not.toHaveBeenCalled();
+  });
+
   it('returns inventory error when repository throws inventory depletion', async () => {
     repo.getTaxJurisdictionByCode.mockResolvedValue({
       id: 1,
@@ -131,7 +157,7 @@ describe('checkout service', () => {
       pickupPointId: 2,
       windowDate: '2026-03-27',
       startTime: '09:00:00',
-      endTime: '11:00:00',
+      endTime: '10:00:00',
       capacityTotal: 10,
       reservedSlots: 3
     });

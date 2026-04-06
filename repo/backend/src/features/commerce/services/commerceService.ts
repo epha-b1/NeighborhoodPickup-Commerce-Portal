@@ -1,6 +1,7 @@
 import { getActiveCycles } from '../repositories/cycleRepository';
 import { getListingsByCycle } from '../repositories/listingRepository';
 import {
+  createPickupWindow,
   findPickupPointById,
   isFavorite,
   toggleFavorite
@@ -73,4 +74,14 @@ export const toggleFavoriteTarget = async (params: {
   });
 
   return result;
+};
+
+export const createPickupWindowService = async (params: {
+  pickupPointId: number;
+  windowDate: string;
+  startTime: string;
+  endTime: string;
+  capacityTotal: number;
+}) => {
+  return createPickupWindow(params);
 };

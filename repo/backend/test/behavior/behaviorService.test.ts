@@ -1,6 +1,9 @@
 import {
+  _getBufferForTesting,
+  getRetentionStatus,
   ingestBehaviorEvents,
-  processBehaviorQueue
+  processBehaviorQueue,
+  runRetentionJobs,
 } from '../../src/features/behavior/services/behaviorService';
 import * as repo from '../../src/features/behavior/repositories/behaviorRepository';
 import * as auditService from '../../src/features/audit/services/auditService';
@@ -19,10 +22,12 @@ describe('behavior service', () => {
     mockedRepo.listPendingBehaviorQueueItems.mockResolvedValue([]);
   });
 
-  it('ingest stores events in queue and skips duplicate idempotency keys', async () => {
-    mockedRepo.insertDedupKey
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+  it('ingest buffers events in memory and skips duplicate idempotency keys', async () => {
+    const buffer = _getBufferForTesting();
+    buffer.items.length = 0;
+    buffer.dedupSet.clear();
+
+    mockedRepo.insertDedupKey.mockResolvedValue(true);
     mockedRepo.insertBehaviorQueue.mockResolvedValue();
 
     const result = await ingestBehaviorEvents({
@@ -46,7 +51,9 @@ describe('behavior service', () => {
     });
 
     expect(result).toEqual({ accepted: 1, duplicates: 1 });
-    expect(mockedRepo.insertBehaviorQueue).toHaveBeenCalledTimes(1);
+    // Events are buffered in memory, not yet written to DB queue
+    expect(buffer.items.length).toBe(1);
+    expect(mockedRepo.insertBehaviorQueue).not.toHaveBeenCalled();
     expect(mockedRepo.insertBehaviorHotEvent).not.toHaveBeenCalled();
     expect(mockedAuditService.recordAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -54,6 +61,14 @@ describe('behavior service', () => {
         metadata: { accepted: 1, duplicates: 1 }
       })
     );
+
+    // Flush writes to DB
+    await buffer.flush();
+    expect(mockedRepo.insertDedupKey).toHaveBeenCalled();
+    expect(mockedRepo.insertBehaviorQueue).toHaveBeenCalled();
+
+    buffer.items.length = 0;
+    buffer.dedupSet.clear();
   });
 
   it('processes pending queue items into hot storage', async () => {
@@ -111,5 +126,62 @@ describe('behavior service', () => {
       })
     );
     expect(mockedRepo.markBehaviorQueueProcessed).not.toHaveBeenCalled();
+  });
+});
+
+describe('behavior retention lifecycle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedRepo.listPendingBehaviorQueueItems.mockResolvedValue([]);
+  });
+
+  it('runRetentionJobs archives hot events and purges old archives', async () => {
+    mockedRepo.archiveExpiredHotEvents.mockResolvedValue(15);
+    mockedRepo.purgeOldArchiveEvents.mockResolvedValue(3);
+
+    const result = await runRetentionJobs(1);
+
+    expect(result.archivedCount).toBe(15);
+    expect(result.purgedCount).toBe(3);
+    expect(mockedRepo.archiveExpiredHotEvents).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.purgeOldArchiveEvents).toHaveBeenCalledTimes(1);
+    expect(mockedAuditService.recordAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ROLLBACK',
+        resourceType: 'BEHAVIOR_RETENTION',
+        metadata: { archivedCount: 15, purgedCount: 3 }
+      })
+    );
+  });
+
+  it('runRetentionJobs handles zero events gracefully', async () => {
+    mockedRepo.archiveExpiredHotEvents.mockResolvedValue(0);
+    mockedRepo.purgeOldArchiveEvents.mockResolvedValue(0);
+
+    const result = await runRetentionJobs(null);
+
+    expect(result.archivedCount).toBe(0);
+    expect(result.purgedCount).toBe(0);
+    expect(mockedAuditService.recordAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: null,
+        metadata: { archivedCount: 0, purgedCount: 0 }
+      })
+    );
+  });
+
+  it('getRetentionStatus returns counts from repository', async () => {
+    mockedRepo.getRetentionStatusCounts.mockResolvedValue({
+      hotCount: 500,
+      archiveCount: 1200,
+      queuePending: 3,
+    });
+
+    const status = await getRetentionStatus();
+
+    expect(status.hotCount).toBe(500);
+    expect(status.archiveCount).toBe(1200);
+    expect(status.queuePending).toBe(3);
+    expect(mockedRepo.getRetentionStatusCounts).toHaveBeenCalledTimes(1);
   });
 });

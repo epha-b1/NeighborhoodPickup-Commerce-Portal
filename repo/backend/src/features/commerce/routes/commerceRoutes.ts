@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAuth, requireRoles } from "../../../middleware/rbac";
 import { sendError, sendSuccess } from "../../../utils/apiResponse";
 import {
+  createPickupWindowService,
   getPickupPointDetail,
   listActiveBuyingCycles,
   listListings,
@@ -41,6 +42,16 @@ const handleRouteError = (error: unknown, response: Response): boolean => {
 
   if (error instanceof Error && error.message.startsWith("Favorite target")) {
     sendError(response, 404, error.message, "FAVORITE_TARGET_NOT_FOUND");
+    return true;
+  }
+
+  if (error instanceof Error && error.message === "INVALID_PICKUP_WINDOW_DURATION") {
+    sendError(
+      response,
+      400,
+      "Pickup windows must be exactly 1 hour (60 minutes).",
+      "INVALID_PICKUP_WINDOW_DURATION",
+    );
     return true;
   }
 
@@ -146,6 +157,32 @@ commerceRouter.post(
         targetId: payload.targetId,
         isFavorite: result.isFavorite,
       });
+    } catch (error) {
+      if (handleRouteError(error, response)) {
+        return;
+      }
+      next(error);
+    }
+  },
+);
+
+const createPickupWindowSchema = z.object({
+  pickupPointId: z.coerce.number().int().positive(),
+  windowDate: z.string().date(),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  capacityTotal: z.coerce.number().int().positive(),
+});
+
+commerceRouter.post(
+  "/admin/pickup-windows",
+  requireAuth,
+  requireRoles("ADMINISTRATOR"),
+  async (request, response, next) => {
+    try {
+      const payload = createPickupWindowSchema.parse(request.body);
+      const result = await createPickupWindowService(payload);
+      sendSuccess(response, result, 201);
     } catch (error) {
       if (handleRouteError(error, response)) {
         return;

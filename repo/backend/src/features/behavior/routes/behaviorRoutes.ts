@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { requireAuth, requireRoles } from "../../../middleware/rbac";
+import { sendError, sendSuccess } from "../../../utils/apiResponse";
 import {
   getBehaviorSummary,
   getRetentionStatus,
@@ -34,9 +35,7 @@ const summaryQuerySchema = z.object({
 
 const handleBehaviorError = (error: unknown, response: Response): boolean => {
   if (error instanceof z.ZodError) {
-    response
-      .status(400)
-      .json({ error: "Invalid request payload.", details: error.issues });
+    sendError(response, 400, "Invalid request payload.", "INVALID_REQUEST_PAYLOAD", error.issues);
     return true;
   }
   return false;
@@ -54,7 +53,7 @@ behaviorRouter.post(
         userId: request.auth!.userId,
         events: payload.events,
       });
-      response.status(202).json(result);
+      sendSuccess(response, result, 202);
     } catch (error) {
       if (handleBehaviorError(error, response)) {
         return;
@@ -72,7 +71,7 @@ behaviorRouter.get(
     try {
       const query = summaryQuerySchema.parse(request.query);
       const rows = await getBehaviorSummary(query);
-      response.json({ data: rows });
+      sendSuccess(response, rows);
     } catch (error) {
       if (handleBehaviorError(error, response)) {
         return;
@@ -89,7 +88,7 @@ behaviorRouter.get(
   async (_request, response, next) => {
     try {
       const status = await getRetentionStatus();
-      response.json(status);
+      sendSuccess(response, status);
     } catch (error) {
       next(error);
     }
@@ -103,7 +102,7 @@ behaviorRouter.post(
   async (request, response, next) => {
     try {
       const result = await runRetentionJobs(request.auth!.userId);
-      response.json(result);
+      sendSuccess(response, result);
     } catch (error) {
       next(error);
     }

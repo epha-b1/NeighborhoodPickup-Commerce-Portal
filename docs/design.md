@@ -106,6 +106,43 @@ Observability:
 - Structured error logging in app middleware.
 - Audit log search/export/verify endpoints.
 
+## Behavior Event Durability
+
+Behavior events flow through a two-stage pipeline:
+
+1. **In-memory buffer** — accepted events are first stored in a bounded in-memory
+   array with a local dedup set.  This avoids per-event synchronous DB writes on the
+   request path, keeping ingest latency low.
+
+2. **Durable MySQL queue** — the buffer is flushed to the `behavior_ingestion_queue`
+   table (with DB-level idempotency key dedup) under three conditions:
+   - **Prompt micro-flush**: a non-blocking `setImmediate` flush fires after every
+     successful ingest call, so events typically become durable within milliseconds
+     of the HTTP 202 response.
+   - **Capacity flush**: when the buffer reaches `BEHAVIOR_BUFFER_CAPACITY` (default 100).
+   - **Timer flush**: a periodic interval (`BEHAVIOR_BUFFER_FLUSH_INTERVAL_MS`,
+     default 5 000 ms) flushes any remaining items.
+
+**RPO (Recovery Point Objective) boundary**: if the process crashes between the
+`setImmediate` scheduling and the flush completing, events that are still in the
+in-memory buffer are lost.  In practice this window is sub-millisecond because the
+micro-flush runs on the next event-loop tick.  Clients may safely retry using the
+same idempotency key without creating duplicates.
+
+Configuration environment variables:
+- `BEHAVIOR_BUFFER_CAPACITY` — max items before forced flush (default 100).
+- `BEHAVIOR_BUFFER_FLUSH_INTERVAL_MS` — timer-based flush interval (default 5 000 ms).
+
+## Pickup Window Invariant
+
+All pickup windows use fixed **1-hour slots** expressed in the pickup point's local
+time.  The schema stores `window_date DATE`, `start_time TIME`, and `end_time TIME`
+without timezone offset; the convention is that these values represent the point's
+physical-location local time.
+
+The `assertValidPickupWindowDuration` helper enforces that `end_time - start_time`
+equals exactly 60 minutes and must be called on any creation or update path.
+
 ## Deployment Notes
 
 - Local development and test execution are standardized on Docker Compose.

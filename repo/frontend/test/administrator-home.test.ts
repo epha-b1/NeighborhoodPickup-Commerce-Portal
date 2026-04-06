@@ -156,4 +156,64 @@ describe("AdministratorHomePage", () => {
 
     expect(wrapper.text()).toContain("No pending applications");
   });
+
+  it("toggles commission eligibility select to ineligible before approving", async () => {
+    const appWithCommission = { ...pendingApp, requestedCommissionEligible: true };
+    getPendingApplicationsMock
+      .mockResolvedValueOnce({ data: [appWithCommission] })
+      .mockResolvedValueOnce({ data: [] });
+
+    decideApplicationMock.mockResolvedValue({
+      id: 3,
+      leaderApplicationId: 5,
+      decision: "APPROVED",
+      reason: "Credentials verified and approved.",
+    });
+
+    const wrapper = mount(AdministratorHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    const select = wrapper.find("select");
+    expect(select.exists()).toBe(true);
+    await select.setValue("false");
+
+    const approveButton = wrapper
+      .findAll("button")
+      .find((btn) => btn.text() === "Approve");
+    await approveButton!.trigger("click");
+    await flush();
+
+    expect(decideApplicationMock).toHaveBeenCalledWith(5, {
+      decision: "APPROVE",
+      reason: "Credentials verified and approved.",
+      commissionEligible: false,
+    });
+  });
+
+  it("displays credential fields when present on application", async () => {
+    getPendingApplicationsMock.mockResolvedValue({ data: [pendingApp] });
+
+    const wrapper = mount(AdministratorHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("Leader Candidate");
+    expect(wrapper.text()).toContain("Has managed a group for two years.");
+    expect(wrapper.text()).toContain("Food Handler Certificate");
+    expect(wrapper.text()).toContain("State Health Dept");
+  });
+
+  it("handles API error gracefully when loading applications fails", async () => {
+    getPendingApplicationsMock.mockRejectedValue(new Error("Network error"));
+
+    const wrapper = mount(AdministratorHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("error");
+  });
 });

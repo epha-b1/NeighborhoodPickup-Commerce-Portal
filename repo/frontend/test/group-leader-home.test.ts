@@ -142,4 +142,105 @@ describe("GroupLeaderHomePage", () => {
     expect(wrapper.text()).toContain("UP");
     expect(wrapper.text()).toContain("Withdrawal Controls");
   });
+
+  it("shows pending status when application is awaiting review", async () => {
+    getMyApplicationMock.mockResolvedValue({
+      data: {
+        id: 1,
+        userId: 10,
+        status: "PENDING",
+        submittedAt: "2026-03-28T00:00:00.000Z",
+        decisionReason: null,
+        decisionCommissionEligible: null,
+      },
+    });
+    getDashboardMetricsMock.mockRejectedValue(new Error("not found"));
+
+    const wrapper = mount(GroupLeaderHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("PENDING");
+    expect(wrapper.text()).toContain("Pending decision");
+  });
+
+  it("shows rejected status with decision reason", async () => {
+    getMyApplicationMock.mockResolvedValue({
+      data: {
+        id: 1,
+        userId: 10,
+        status: "REJECTED",
+        submittedAt: "2026-03-28T00:00:00.000Z",
+        decisionReason: "Incomplete documentation",
+        decisionCommissionEligible: false,
+      },
+    });
+    getDashboardMetricsMock.mockRejectedValue(new Error("not found"));
+
+    const wrapper = mount(GroupLeaderHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("REJECTED");
+    expect(wrapper.text()).toContain("Incomplete documentation");
+  });
+
+  it("validates experience summary minimum length", async () => {
+    getMyApplicationMock.mockResolvedValue({ data: null });
+    getDashboardMetricsMock.mockRejectedValue(new Error("not found"));
+
+    const wrapper = mount(GroupLeaderHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    await wrapper.find('input[maxlength="120"]').setValue("Jane Leader");
+    await wrapper.find('input[maxlength="32"]').setValue("555-1234");
+    await wrapper.find("textarea").setValue("Short");
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flush();
+
+    expect(createApplicationMock).not.toHaveBeenCalled();
+  });
+
+  it("shows withdrawal controls with eligibility status", async () => {
+    getMyApplicationMock.mockResolvedValue({
+      data: {
+        id: 1,
+        userId: 10,
+        status: "APPROVED",
+        submittedAt: "2026-03-28T00:00:00.000Z",
+        decisionReason: "Approved",
+        decisionCommissionEligible: true,
+      },
+    });
+    getDashboardMetricsMock.mockResolvedValue({
+      leaderId: 1,
+      windowStartDate: "2026-03-01",
+      windowEndDate: "2026-03-30",
+      orderVolume: 10,
+      fulfillmentRate: 100,
+      feedbackTrend: { direction: "STABLE", latest7DayAverage: 4.0, previous7DayAverage: 4.0 },
+      daily: [],
+    });
+    getWithdrawalEligibilityMock.mockResolvedValue({
+      leaderUserId: 10,
+      blacklisted: true,
+      remainingDailyAmount: 0,
+      remainingWeeklyCount: 0,
+      eligible: false,
+      reason: "Leader is blacklisted for withdrawals.",
+    });
+
+    const wrapper = mount(GroupLeaderHomePage, {
+      global: { stubs: { RouterLink: true } },
+    });
+    await flush();
+
+    expect(wrapper.text()).toContain("Withdrawal Controls");
+    expect(wrapper.text()).toContain("Refresh Eligibility");
+  });
 });

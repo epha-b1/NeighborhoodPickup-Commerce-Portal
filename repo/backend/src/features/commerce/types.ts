@@ -1,3 +1,5 @@
+export type BuyingCycleStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'FULFILLED' | 'ARCHIVED';
+
 export type FavoriteType = 'PICKUP_POINT' | 'LEADER';
 
 export type ActiveCycle = {

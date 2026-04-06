@@ -17,6 +17,9 @@
         <button @click="$emit('appeal', comment.id)">
           Appeal this moderation
         </button>
+        <button v-if="canUnhide" @click="$emit('unhide', comment.id)">
+          Unhide Comment
+        </button>
       </div>
     </div>
 
@@ -46,6 +49,7 @@ import type { DiscussionComment } from "../../types/discussion";
 
 const props = defineProps<{
   comment: DiscussionComment;
+  canUnhide?: boolean;
 }>();
 
 defineEmits<{
@@ -54,6 +58,7 @@ defineEmits<{
   flag: [commentId: number];
   appeal: [commentId: number];
   vote: [commentId: number];
+  unhide: [commentId: number];
 }>();
 
 const collapsed = ref(true);

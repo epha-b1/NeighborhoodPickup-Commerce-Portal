@@ -1,6 +1,37 @@
 import { dbPool } from '../../../db/pool';
 import type { FavoriteType } from '../types';
 
+// ---------------------------------------------------------------------------
+// Pickup-window duration invariant
+// All pickup windows use fixed 1-hour slots expressed in the pickup point's
+// local time.  The schema stores DATE + TIME columns (no timezone offset);
+// the convention is that start_time/end_time are local to the point's
+// physical location.
+// ---------------------------------------------------------------------------
+const REQUIRED_WINDOW_DURATION_MINUTES = 60;
+
+/**
+ * Parses a TIME string ("HH:MM:SS" or "HH:MM") into total minutes since midnight.
+ */
+const timeToMinutes = (time: string): number => {
+  const parts = time.split(':').map(Number);
+  return parts[0] * 60 + parts[1];
+};
+
+/**
+ * Validates that a pickup-window duration is exactly 60 minutes.
+ * Throws INVALID_PICKUP_WINDOW_DURATION if the constraint is violated.
+ */
+export const assertValidPickupWindowDuration = (startTime: string, endTime: string): void => {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  const duration = endMinutes - startMinutes;
+
+  if (duration !== REQUIRED_WINDOW_DURATION_MINUTES) {
+    throw new Error('INVALID_PICKUP_WINDOW_DURATION');
+  }
+};
+
 export type PickupPointRow = {
   id: number;
   name: string;
@@ -201,4 +232,29 @@ export const getLatestSnapshotForWindow = async (
     capacityTotal: Number(rows[0].capacity_total),
     capacityReserved: Number(rows[0].capacity_reserved)
   };
+};
+
+export const createPickupWindow = async (params: {
+  pickupPointId: number;
+  windowDate: string;
+  startTime: string;
+  endTime: string;
+  capacityTotal: number;
+}): Promise<{ id: number }> => {
+  assertValidPickupWindowDuration(params.startTime, params.endTime);
+
+  const [result] = await dbPool.query<any>(
+    `INSERT INTO pickup_windows
+      (pickup_point_id, window_date, start_time, end_time, capacity_total, reserved_slots)
+     VALUES (?, ?, ?, ?, ?, 0)`,
+    [
+      params.pickupPointId,
+      params.windowDate,
+      params.startTime,
+      params.endTime,
+      params.capacityTotal,
+    ],
+  );
+
+  return { id: Number(result.insertId) };
 };

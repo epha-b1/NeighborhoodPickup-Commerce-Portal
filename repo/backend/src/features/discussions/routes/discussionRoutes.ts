@@ -1,6 +1,6 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
-import { requireAuth } from "../../../middleware/rbac";
+import { requireAuth, requireRoles } from "../../../middleware/rbac";
 import { sendError, sendSuccess } from "../../../utils/apiResponse";
 import {
   createThreadComment,
@@ -9,6 +9,7 @@ import {
   resolveThreadByContext,
   listUserNotifications,
   patchNotificationReadState,
+  unhideComment,
 } from "../services/discussionService";
 
 const createCommentSchema = z.object({
@@ -107,6 +108,26 @@ const handleDiscussionError = (error: unknown, response: Response): boolean => {
     return true;
   }
 
+  if (error instanceof Error && error.message === "UNHIDE_FORBIDDEN") {
+    sendError(
+      response,
+      403,
+      "Only reviewers or administrators can unhide comments.",
+      "UNHIDE_FORBIDDEN",
+    );
+    return true;
+  }
+
+  if (error instanceof Error && error.message === "COMMENT_NOT_HIDDEN") {
+    sendError(
+      response,
+      400,
+      "Comment is not currently hidden.",
+      "COMMENT_NOT_HIDDEN",
+    );
+    return true;
+  }
+
   return false;
 };
 
@@ -115,6 +136,7 @@ export const discussionRouter = Router();
 discussionRouter.post(
   "/comments",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const payload = createCommentSchema.parse(request.body);
@@ -139,6 +161,7 @@ discussionRouter.post(
 discussionRouter.get(
   "/threads/:id/comments",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const discussionId = z.coerce
@@ -174,6 +197,7 @@ discussionRouter.get(
 discussionRouter.get(
   "/threads/resolve",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const query = threadResolveQuerySchema.parse(request.query);
@@ -198,6 +222,7 @@ discussionRouter.get(
 discussionRouter.post(
   "/comments/:id/flag",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const commentId = z.coerce
@@ -227,6 +252,7 @@ discussionRouter.post(
 discussionRouter.get(
   "/notifications",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const page = z.coerce
@@ -258,6 +284,7 @@ discussionRouter.get(
 discussionRouter.patch(
   "/notifications/:id/read-state",
   requireAuth,
+  requireRoles("MEMBER", "GROUP_LEADER", "REVIEWER", "ADMINISTRATOR"),
   async (request, response, next) => {
     try {
       const notificationId = z.coerce
@@ -287,6 +314,40 @@ discussionRouter.patch(
         notificationId,
         readState: payload.readState,
       });
+    } catch (error) {
+      if (handleDiscussionError(error, response)) {
+        return;
+      }
+      next(error);
+    }
+  },
+);
+
+const unhideReasonSchema = z.object({
+  reason: z.string().trim().min(3).max(255),
+});
+
+discussionRouter.patch(
+  "/comments/:id/visibility",
+  requireAuth,
+  requireRoles("REVIEWER", "ADMINISTRATOR"),
+  async (request, response, next) => {
+    try {
+      const commentId = z.coerce
+        .number()
+        .int()
+        .positive()
+        .parse(request.params.id);
+      const payload = unhideReasonSchema.parse(request.body);
+
+      const result = await unhideComment({
+        commentId,
+        actorUserId: request.auth!.userId,
+        roles: request.auth!.roles,
+        reason: payload.reason,
+      });
+
+      sendSuccess(response, result);
     } catch (error) {
       if (handleDiscussionError(error, response)) {
         return;

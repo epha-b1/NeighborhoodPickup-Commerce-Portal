@@ -104,7 +104,7 @@ export type CheckoutResult =
     }
   | {
       ok: false;
-      code: 'CAPACITY_EXCEEDED' | 'INSUFFICIENT_INVENTORY' | 'INVALID_ORDER';
+      code: 'CAPACITY_EXCEEDED' | 'INSUFFICIENT_INVENTORY' | 'INVALID_ORDER' | 'CYCLE_NOT_ACTIVE';
       conflict?: CapacityConflict;
       message: string;
     };
